@@ -3,19 +3,21 @@
 """
 Created on Tue May 22 22:02:13 2018
 
-@author: leosun
+@author: Fangzhou Sun
 """
 
 import numpy as np
 import logging
 from gurobipy import *
 
+# Enable pause m.optimize() by 'ctrl + c'
 def keyboard_terminate(model, where):
     try:
         pass
     except KeyboardInterrupt:
         model.terminate()
 
+# Set up logger
 logger = logging.getLogger(__name__)
 if not logger.hasHandlers():
     stream_handler = logging.StreamHandler()
@@ -32,7 +34,7 @@ logger.info('Begin')
 # =========================== Parameters ======================================
 np.random.seed(1)
 TOL = 1e-6
-W_roll = 100 # stock width
+W_roll = 100 # roll width
 I = list(range(5)) # item set
 w = np.random.randint(1, 50, len(I)).tolist() # width of each item
 d = np.random.randint(1, 50, len(I)).tolist() # demand of each item
@@ -42,7 +44,7 @@ for i in I:
 
 # ========================= Master Problem ====================================
 m = Model('cutstock') # master problem
-x = m.addVars(I, obj=1, vtype='C', name='x')
+x = m.addVars(I, obj=1, vtype='C', name='x') # num of times a pattern is used
 c1 = m.addConstrs((patterns[i][i] * x[i] >= d[i] for i in I), name='c1')
 m.ModelSense = GRB.MINIMIZE
 
@@ -73,7 +75,7 @@ while min_rc < -TOL:
 
 # ====================== Relaxed Model Result =================================
 logger.info(f'min reduced cost = {min_rc:.2f} >= 0')
-relaxed_result = [f'{v.x:.4f}: {patterns[p]}' for
+relaxed_result = [f'{v.x:.4f} * {patterns[p]}' for
                   p, v in enumerate(m.getVars()) if v.x > TOL]
 relaxed_result.insert(0, f'Relaxed result = {m.objVal:.2f} rolls')
 logger.info('\n\t'.join(relaxed_result))
@@ -83,7 +85,7 @@ m.setAttr('VType', x.values(), 'I'*len(x))
 m.update()
 m.write('cutstock.lp')
 m.optimize(keyboard_terminate)
-m_result = [f'{int(v.x)}: {patterns[p]}' for
+m_result = [f'{int(v.x)} * {patterns[p]}' for
             p, v in enumerate(m.getVars()) if v.x > TOL]
 m_result.insert(0, f'Integer result = {int(m.objVal)} rolls')
 logger.info('\n\t'.join(m_result))
