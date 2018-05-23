@@ -85,7 +85,7 @@ m.setAttr('VType', x.values(), 'I'*len(x))
 m.update()
 m.write('cutstock.lp')
 m.optimize(keyboard_terminate)
-m_result = [f'{int(v.x)} * {patterns[p]}' for
+integer_result = [f'{int(v.x)} * {patterns[p]}' for
             p, v in enumerate(m.getVars()) if v.x > TOL]
-m_result.insert(0, f'Integer result = {int(m.objVal)} rolls')
-logger.info('\n\t'.join(m_result))
+integer_result.insert(0, f'Integer result = {int(m.objVal)} rolls')
+logger.info('\n\t'.join(integer_result))
