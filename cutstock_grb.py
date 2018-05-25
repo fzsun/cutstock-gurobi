@@ -4,6 +4,22 @@
 Created on Tue May 22 22:02:13 2018
 
 @author: Fangzhou Sun
+
+This code solves the following cutting stock model:
+
+Master problem:
+    min     \sum_{p in P} x_p
+    s.t.    \sum_{p in P} patterns_{ip} * x_p ≥ d_i, for i in I
+            x_p ≥ 0 and integer, for p in P
+
+Subproblem:
+    min     1 - \sum_{i in I} price_i * use_i
+    s.t.    \sum_{i in I} w_i * use_i ≤ W_roll
+            use_i ≥ 0 and integer, for i in I
+
+x_p: number of times pattern p is used
+price_i: dual of constraint i in the master problem
+use_i: number of item i's in a new pattern
 """
 
 import numpy as np
@@ -36,28 +52,25 @@ W_roll = 100 # roll width
 I = list(range(5)) # item set
 w = np.random.randint(1, 50, len(I)).tolist() # width of each item
 d = np.random.randint(1, 50, len(I)).tolist() # demand of each item
-patterns = np.zeros((len(I), len(I))).astype(int).tolist() # initial pattern
-for i in I:
-    patterns[i][i] = W_roll // w[i]
+patterns = np.diag([W_roll // w[i] for i in I]).tolist() # initial patterns
 
 # ========================= Master Problem ====================================
-m = Model('cutstock') # master problem
-x = m.addVars(I, obj=1, vtype='C', name='x') # num of times a pattern is used
-c1 = m.addConstrs((patterns[i][i] * x[i] >= d[i] for i in I), name='c1')
+m = Model('cutstock')
 m.ModelSense = GRB.MINIMIZE
+x = m.addVars(len(patterns), obj=1, vtype='C', name='x')
+c1 = m.addConstrs((patterns[i][i] * x[i] >= d[i] for i in I), name='c1')
 
 # ======================= Subproblem and Iteration ============================
 for iter_count in count():
-    m.update()
-    m.write('main_problem.lp')
+    m.write('master_problem.lp')
     m.optimize(keyboard_terminate)
     price = [c1[i].pi for i in I]
     print(f'Price = {price}')
-# Subproblem
-    sp = Model('subproblem')
+
+    sp = Model('subproblem') # Subproblem
+    sp.ModelSense = GRB.MAXIMIZE
     use = sp.addVars(I, obj=price, vtype='I', name='use')
     c2 = sp.addConstr(quicksum(w[i]*use[i] for i in I) <= W_roll)
-    sp.ModelSense = GRB.MAXIMIZE
     sp.write('subproblem.lp')
     sp.optimize(keyboard_terminate)
     min_rc = 1 - sp.objVal
@@ -79,8 +92,7 @@ logger.info('\n\t'.join(relaxed_result))
 
 # ====================== Integer Model Result =================================
 m.setAttr('VType', x.values(), 'I'*len(x))
-m.update()
-m.write('main_problem.lp')
+m.write('master_problem.lp')
 m.optimize(keyboard_terminate)
 integer_result = [f'{int(v.x)} * {patterns[p]}' for
             p, v in enumerate(m.getVars()) if v.x > TOL]
